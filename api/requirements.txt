@@ -1,0 +1,12 @@
+Flask
+Flask-SQLAlchemy
+psycopg2-binary
+Flask-Migrate
+
+
+pystan
+statsmodels
+yahoo-finance
+yfinance
+xgboost
+pmdarima

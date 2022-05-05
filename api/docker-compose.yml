@@ -1,0 +1,32 @@
+version: '2'
+
+networks:
+  inf723-tp:
+    driver: bridge
+
+services:
+  database:
+    image: postgres:12.1
+    container_name: inf723-tp-database
+    ports:
+      - 5432:5432
+    networks:
+      - inf723-tp
+    environment:
+      - POSTGRES_DB=inf723-tp
+      - POSTGRES_USER=inf723-tp
+      - POSTGRES_PASSWORD=inf723-tp
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+  api:
+    build: .
+    working_dir: /code
+    stdin_open: true
+    container_name: inf723-tp-api
+    volumes:
+      - ./:/code:consistent
+    ports:
+      - 5000:5000
+    networks:
+      - inf723-tp
+    env_file: .env

@@ -1,0 +1,14 @@
+version: '2'
+
+services:
+  front:
+    build: .
+    working_dir: /code
+    stdin_open: true
+    container_name: inf723-tp-frontend
+    command: bash -c 'yarn && yarn run start'
+    volumes:
+      - ./:/code:consistent
+      - /code/node_modules:cached
+    ports:
+      - 80:3000
