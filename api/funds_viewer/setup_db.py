@@ -120,162 +120,229 @@ def machineLearningPredict(dfs, ativo, columns, months_to_predict):
 
     return xgboost_df
 
-first_day = pd.to_datetime('today').replace(day=1,hour=0,minute=0,second=0,microsecond=0)
-this_month = (first_day).strftime("%Y-%m")
-last_month = (first_day - relativedelta(months=1)).strftime("%Y-%m")
-headers = {
-    'User-Agent':
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_4) AppleWebKit/537.36'
-        ' (KHTML, like Gecko) Chrome/51.0.2704.103 Safari/537.36'
-}
-url = 'https://www.fundsexplorer.com.br/ranking'
+def run_crawling():
+    first_day = pd.to_datetime('today').replace(day=1,hour=0,minute=0,second=0,microsecond=0)
+    this_month = (first_day).strftime("%Y-%m")
+    last_month = (first_day - relativedelta(months=1)).strftime("%Y-%m")
+    headers = {
+        'User-Agent':
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_4) AppleWebKit/537.36'
+            ' (KHTML, like Gecko) Chrome/51.0.2704.103 Safari/537.36'
+    }
+    url = 'https://www.fundsexplorer.com.br/ranking'
 
-response = requests.get(url, headers=headers)
-if response.status_code == 200:
-    df = pd.read_html(response.content, encoding='utf-8')[0]
-
-df.sort_values('Códigodo fundo', inplace=True)
-
-col_categorical = ['Códigodo fundo','Setor']
-
-idx = df[df['Setor'].isna()].index
-df.drop(idx, inplace=True)
-
-df[col_categorical] = df[col_categorical].astype('category')
-
-col_floats = list(df.iloc[:,2:-1].columns)
-
-df[col_floats] = df[col_floats].fillna(value=0)
-
-df[col_floats] = df[col_floats].applymap(lambda x: str(x).replace('R$', '').replace('.0','').replace('.','').replace('%','').replace(',','.'))
-
-df[col_floats] = df[col_floats].astype('float')
-
-idx = df[np.isinf(df[col_floats]).any(1)].index
-df.drop(idx, inplace=True)
-
-df['P/VPA'] = df['P/VPA']/100
-
-indicadores = [
-    'Códigodo fundo',
-    'Setor',
-    'DY (12M)Acumulado',
-    'VacânciaFísica',
-    'VacânciaFinanceira',
-    'P/VPA',
-    'QuantidadeAtivos',
-    'Liquidez Diária'
-]
-
-df_aux = df[indicadores]
-
-media_setor = df_aux.groupby('Setor').agg(['mean','std'])
-
-media_setor.loc['Residencial', ('DY (12M)Acumulado', 'mean')]
-
-dfs = {}
-newColumn = []
-predict_months = 2
-remover_fundos = []
-
-for t in df['Códigodo fundo']:
-    ticker = yf.Ticker(t + '.SA')
-    aux = ticker.history(interval='1mo',period="max")
-
-    dados_recentes = False
-    for data in aux.index:
-        if last_month in str(data) or this_month in str(data):
-            dados_recentes = True
-
-    if dados_recentes == False:
-        print("FII " + t + " será removido por não conter dados recentes.")
-        remover_fundos.append(t)
-    elif aux.empty or len(aux.index) < 20:
-        print("FII " + t + " será removido por pouca quantidade de dados (" + str(len(aux.index)) + ")")
-        remover_fundos.append(t)
-    else:
-        print('Lendo FII {}...'.format(t))
-        aux.reset_index(inplace=True)
-        aux['ticker'] = t
-
-        new_dates = []
-        add_month = dateutil.relativedelta.relativedelta(months=1)
-
-        for index, row in aux.iterrows():
-
-            newDate = datetime.datetime(row['Date'].year, row['Date'].month, 1)
-
-            if(row['Date'].day > 15):
-                newDate = newDate + add_month
-            new_dates.append(newDate)
-
-        aux['new_dates'] = new_dates
-
-        dfs[t] = aux
-        #df[df['Códigodo fundo'] == t]['Preço futuro (1m)'] =
-        #dfs[t]['mm5d'] = dfs[t]['Close'].rolling(5).mean()
-        #dfs[t]['mm21d'] = dfs[t]['Close'].rolling(21).mean()
-        dfs[t] = dfs[t].shift(-1)
-        dfs[t].dropna(inplace=True)
-        dfs[t] = dfs[t].reset_index(drop=True)
-        dfs[t] = dfs[t][dfs[t]['new_dates'] < first_day]
-        dfs[t] = dfs[t].set_index('new_dates')
-
-        try:
-            dfs[t].index.freq = 'MS'
-        except:
-            dfs[t].index.freq = None
-            remover_fundos.append(t)
-            del dfs[t]
-            print("FII " + t + " será removido por estar com dados faltantes.")
-
-df = df[~df.isin(remover_fundos).any(axis=1)]
-
-columns = {'Código': [],'Endereço': [], 'Bairro': [], 'Cidade': [], 'Área Bruta Locável': []}
-df_ativos = pd.DataFrame(columns)
-
-for fundo in dfs:
-    url = 'https://www.fundsexplorer.com.br/funds/' + fundo
     response = requests.get(url, headers=headers)
+    if response.status_code == 200:
+        df = pd.read_html(response.content, encoding='utf-8')[0]
 
-    soup = bs4.BeautifulSoup(response.content, "html")
-    div = soup.find("div", {"id": "dividends-chart-wrapper"})
+    df.sort_values('Códigodo fundo', inplace=True)
 
-    labels = re.findall('"labels":\[.*?\]', str(div))
-    dividends = re.findall('"data":\[.*?\]', str(div))
+    col_categorical = ['Códigodo fundo','Setor']
 
-    # parse data:
-    dividends = json.loads("{" + dividends[0] + "}")['data']
-    labels = json.loads("{" + labels[0] + "}")['labels']
+    idx = df[df['Setor'].isna()].index
+    df.drop(idx, inplace=True)
 
-    # converte "Março/2021" para "2021-03-01"
-    datas = converteData(labels, False)
+    df[col_categorical] = df[col_categorical].astype('category')
 
-    for i in range(len(datas)):
-        dfs[fundo].loc[dfs[fundo].index[dfs[fundo].index == datas[i]],'Dividends'] = dividends[i]
+    col_floats = list(df.iloc[:,2:-1].columns)
 
-    if ('Ativos do ') in str(response.content):
-        print("Coletando ativos de " + fundo + "...")
+    df[col_floats] = df[col_floats].fillna(value=0)
 
-        soup = BeautifulSoup(response.content,"lxml")
-        w3schollsList = soup.find("div",id="fund-actives-items")
-        lista = w3schollsList.find_all('ul')
+    df[col_floats] = df[col_floats].applymap(lambda x: str(x).replace('R$', '').replace('.0','').replace('.','').replace('%','').replace(',','.'))
 
-        for l in lista:
-            newRow = {}
+    df[col_floats] = df[col_floats].astype('float')
 
-            itemList = l.find_all('li')
-            for it in itemList:
-                line = str(it)
+    idx = df[np.isinf(df[col_floats]).any(1)].index
+    df.drop(idx, inplace=True)
 
-                for column in ['Endereço', 'Bairro', 'Cidade', 'Área Bruta Locável']:
-                    updateColumn(column, line, newRow)
+    df['P/VPA'] = df['P/VPA']/100
 
-            if len(newRow) > 0:
-                newRow['Código'] = fundo
-                df_ativos = df_ativos.append(newRow, ignore_index = True)
-    else:
-        print(fundo + " não possui ativos.")
+    indicadores = [
+        'Códigodo fundo',
+        'Setor',
+        'DY (12M)Acumulado',
+        'VacânciaFísica',
+        'VacânciaFinanceira',
+        'P/VPA',
+        'QuantidadeAtivos',
+        'Liquidez Diária'
+    ]
 
-columns_str = ['Código','Endereço', 'Bairro', 'Cidade']
-df_ativos[columns_str] = df_ativos[columns_str].astype("string")
+    df_aux = df[indicadores]
+
+    media_setor = df_aux.groupby('Setor').agg(['mean','std'])
+
+    media_setor.loc['Residencial', ('DY (12M)Acumulado', 'mean')]
+
+    dfs = {}
+    newColumn = []
+    predict_months = 2
+    remover_fundos = []
+
+    for t in df['Códigodo fundo']:
+        ticker = yf.Ticker(t + '.SA')
+        aux = ticker.history(interval='1mo',period="max")
+
+        dados_recentes = False
+        for data in aux.index:
+            if last_month in str(data) or this_month in str(data):
+                dados_recentes = True
+
+        if dados_recentes == False:
+            print("FII " + t + " será removido por não conter dados recentes.")
+            remover_fundos.append(t)
+        elif aux.empty or len(aux.index) < 20:
+            print("FII " + t + " será removido por pouca quantidade de dados (" + str(len(aux.index)) + ")")
+            remover_fundos.append(t)
+        else:
+            print('Lendo FII {}...'.format(t))
+            aux.reset_index(inplace=True)
+            aux['ticker'] = t
+
+            new_dates = []
+            add_month = dateutil.relativedelta.relativedelta(months=1)
+
+            for index, row in aux.iterrows():
+
+                newDate = datetime.datetime(row['Date'].year, row['Date'].month, 1)
+
+                if(row['Date'].day > 15):
+                    newDate = newDate + add_month
+                new_dates.append(newDate)
+
+            aux['new_dates'] = new_dates
+
+            dfs[t] = aux
+            #df[df['Códigodo fundo'] == t]['Preço futuro (1m)'] =
+            #dfs[t]['mm5d'] = dfs[t]['Close'].rolling(5).mean()
+            #dfs[t]['mm21d'] = dfs[t]['Close'].rolling(21).mean()
+            dfs[t] = dfs[t].shift(-1)
+            dfs[t].dropna(inplace=True)
+            dfs[t] = dfs[t].reset_index(drop=True)
+            dfs[t] = dfs[t][dfs[t]['new_dates'] < first_day]
+            dfs[t] = dfs[t].set_index('new_dates')
+
+            try:
+                dfs[t].index.freq = 'MS'
+            except:
+                dfs[t].index.freq = None
+                remover_fundos.append(t)
+                del dfs[t]
+                print("FII " + t + " será removido por estar com dados faltantes.")
+
+    df = df[~df.isin(remover_fundos).any(axis=1)]
+
+    columns = {'Código': [],'Endereço': [], 'Bairro': [], 'Cidade': [], 'Área Bruta Locável': []}
+    df_ativos = pd.DataFrame(columns)
+
+    for fundo in dfs:
+        url = 'https://www.fundsexplorer.com.br/funds/' + fundo
+        response = requests.get(url, headers=headers)
+
+        soup = bs4.BeautifulSoup(response.content, "html")
+        div = soup.find("div", {"id": "dividends-chart-wrapper"})
+
+        labels = re.findall('"labels":\[.*?\]', str(div))
+        dividends = re.findall('"data":\[.*?\]', str(div))
+
+        # parse data:
+        dividends = json.loads("{" + dividends[0] + "}")['data']
+        labels = json.loads("{" + labels[0] + "}")['labels']
+
+        # converte "Março/2021" para "2021-03-01"
+        datas = converteData(labels, False)
+
+        for i in range(len(datas)):
+            dfs[fundo].loc[dfs[fundo].index[dfs[fundo].index == datas[i]],'Dividends'] = dividends[i]
+
+        if ('Ativos do ') in str(response.content):
+            print("Coletando ativos de " + fundo + "...")
+
+            soup = BeautifulSoup(response.content,"lxml")
+            w3schollsList = soup.find("div",id="fund-actives-items")
+            lista = w3schollsList.find_all('ul')
+
+            for l in lista:
+                newRow = {}
+
+                itemList = l.find_all('li')
+                for it in itemList:
+                    line = str(it)
+
+                    for column in ['Endereço', 'Bairro', 'Cidade', 'Área Bruta Locável']:
+                        updateColumn(column, line, newRow)
+
+                if len(newRow) > 0:
+                    newRow['Código'] = fundo
+                    df_ativos = df_ativos.append(newRow, ignore_index = True)
+        else:
+            print(fundo + " não possui ativos.")
+
+    columns_str = ['Código','Endereço', 'Bairro', 'Cidade']
+    df_ativos[columns_str] = df_ativos[columns_str].astype("string")
+    df_ativos['UF'] = df_ativos['Cidade'].str[-2:]
+
+    return (df, df_ativos)
+
+# DE FATO INSERINDO
+def run_insertion():
+    from funds_viewer.database import engine, init_db
+
+    print('Initing the database')
+    init_db()
+
+    print('Checking if the database needs seeding')
+    from funds_viewer.models.funds import Funds
+    if Funds.query.count() > 1:
+        print('Database already has funds data. Skipping...')
+        return
+
+    print('Crawling...')
+    df, df_ativos = run_crawling()
+
+    print('Inserting the data...')
+
+    funds_df = df_ativos.rename(columns={
+        'Código': 'code',
+        'Endereço': 'address',
+        'Bairro': 'neighborhood',
+        'Cidade': 'city',
+        'Área Bruta Locável': 'area',
+        'UF': 'uf',
+    })
+    funds_df.to_sql('funds', engine, if_exists='replace', index_label='id')
+
+
+    funds_metrics_df = df.rename(columns={
+        'Códigodo fundo': 'code',
+        'Setor': 'sector',
+        'Preço Atual': 'current_price',
+        'Liquidez Diária': 'daily_liquidity',
+        'Dividendo': 'dividend',
+        'DividendYield': 'dividend_yield',
+        'DY (3M)Acumulado': 'dy_3m_accumulated',
+        'DY (6M)Acumulado': 'dy_6m_accumulated',
+        'DY (12M)Acumulado': 'dy_12m_accumulated',
+        'DY (3M)Média': 'dy_3m_average',
+        'DY (6M)Média': 'dy_6m_average',
+        'DY (12M)Média': 'dy_12m_average',
+        'DY Ano': 'dy_year',
+        'Variação Preço': 'price_variation',
+        'Rentab.Período': 'income_period',
+        'Rentab.Acumulada': 'income_accumulated',
+        'PatrimônioLíq.': 'net_worth',
+        'VPA': 'vpa',
+        'P/VPA': 'p_vpa',
+        'DYPatrimonial': 'equity_dy',
+        'VariaçãoPatrimonial': 'equity_variation',
+        'Rentab. Patr.no Período': 'equity_return_period',
+        'Rentab. Patr.Acumulada': 'equity_return_accumulated',
+        'VacânciaFísica': 'physical_vacancy',
+        'VacânciaFinanceira': 'financial_vacancy',
+        'QuantidadeAtivos': 'assets_quality'
+    })
+    funds_metrics_df.to_sql('funds_metrics', engine, if_exists='replace', index_label='id')
+
+
+if __name__ == '__main__':
+    run_insertion()

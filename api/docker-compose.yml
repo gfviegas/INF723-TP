@@ -17,16 +17,19 @@ services:
       - POSTGRES_USER=inf723-tp
       - POSTGRES_PASSWORD=inf723-tp
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - database_data:/var/lib/postgresql/data
   api:
     build: .
     working_dir: /code
     stdin_open: true
     container_name: inf723-tp-api
     volumes:
-      - ./:/code:consistent
+      - ./:/code
     ports:
-      - 5000:5000
+      - 81:5000
     networks:
       - inf723-tp
     env_file: .env
+
+volumes:
+  database_data: null

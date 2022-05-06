@@ -1,16 +1,33 @@
 from flask import Flask, request
-from flask_sqlalchemy import SQLAlchemy
-from flask_migrate import Migrate
+from funds_viewer.database import db_session
+
+from funds_viewer.controllers import funds_controller, funds_metrics_controller
 
 app = Flask(__name__)
 
-db = SQLAlchemy(app)
-migrate = Migrate(app, db)
+@app.teardown_appcontext
+def shutdown_session(exception=None):
+    db_session.remove()
 
-@app.route('/')
+@app.route('/', methods=['GET'])
 def hello():
-  return {"hello": "world", "name": __name__, "database": app.config.from_envvar('DATABASE_URL')}
+  return {'hello': 'world', 'name': __name__, 'foo': 'bar'}
 
+@app.route('/funds', methods=['GET'])
+def get_funds():
+    return funds_controller.get_all()
+
+@app.route('/funds/<id>', methods=['GET'])
+def get_fund_by_id(id):
+    return funds_controller.get_by_id(id)
+
+@app.route('/funds_metrics', methods=['GET'])
+def get_funds_metrics():
+    return funds_metrics_controller.get_all()
+
+@app.route('/funds_metrics/<id>', methods=['GET'])
+def get_fund_metrics_by_id(id):
+    return funds_metrics_controller.get_by_id(id)
 
 if __name__ == '__main__':
   app.run(
