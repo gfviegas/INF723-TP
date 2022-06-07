@@ -1,9 +1,12 @@
 from flask import Flask, request
+from flask_cors import CORS, cross_origin
+
 from funds_viewer.database import db_session
 
 from funds_viewer.controllers import funds_controller, funds_metrics_controller
 
 app = Flask(__name__)
+cors = CORS(app)
 
 @app.teardown_appcontext
 def shutdown_session(exception=None):

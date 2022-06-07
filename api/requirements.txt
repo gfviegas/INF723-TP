@@ -10,3 +10,4 @@ yahoo-finance
 yfinance
 xgboost
 pmdarima
+flask-cors

@@ -35,7 +35,7 @@ export default function Navbar() {
     <AppBar position='absolute'>
       <Toolbar sx={{ pr: '24px' }}>
         <Typography component='h1' variant='h6' color='inherit' noWrap sx={{ flexGrow: 1 }}>
-          Dashboard
+          Funds Viewer - Dashboard
         </Typography>
       </Toolbar>
     </AppBar>

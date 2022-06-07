@@ -1,33 +1,44 @@
 import * as React from 'react'
-import { createTheme, ThemeProvider } from '@mui/material/styles'
-import CssBaseline from '@mui/material/CssBaseline'
-import Box from '@mui/material/Box'
-import { deepPurple } from '@mui/material/colors'
 
-import Navbar from './components/Navbar'
+import Box from '@mui/material/Box'
 import Toolbar from '@mui/material/Toolbar'
 import Container from '@mui/material/Container'
 import Grid from '@mui/material/Grid'
 import Paper from '@mui/material/Paper'
+
+import Navbar from './components/Navbar'
 import ChartExample from './components/ChartExample'
 import CardExample from './components/CardExample'
 import Copyright from './components/Copyright'
 import TableExample from './components/TableExample'
 
-const mdTheme = createTheme({
-  palette: {
-    primary: deepPurple,
-    secondary: {
-      main: '#fbc02d',
-    },
-  },
-})
+import { fetchAllFunds, fetchAllFundsMetrics } from './services/api'
+import { LoadingContext, LoadingContextProp } from './providers/Loading'
 
-function DashboardContent() {
+import { Fund, FundMetric } from './types'
+
+export default function Dashboard() {
+  const { setLoading } = React.useContext<LoadingContextProp>(LoadingContext)
+  const [funds, setFunds] = React.useState<Fund[]>()
+  const [fundsMetrics, setFundsMetrics] = React.useState<FundMetric[]>()
+
+  const fetchData = async () => {
+    setLoading(true)
+    const [fundsResponse, fundsMetrics] = await Promise.all([
+      fetchAllFunds(),
+      fetchAllFundsMetrics(),
+    ])
+    setFunds(fundsResponse.data.funds)
+    setFundsMetrics(fundsMetrics.data.funds_metrics)
+    setLoading(false)
+  }
+
+  React.useEffect(() => {
+    fetchData()
+  }, [])
+
   return (
-    <ThemeProvider theme={mdTheme}>
       <Box sx={{ display: 'flex' }}>
-        <CssBaseline />
         <Navbar />
 
         <Box
@@ -52,7 +63,7 @@ function DashboardContent() {
                     height: 480,
                   }}
                 >
-                  <ChartExample />
+                  {fundsMetrics && fundsMetrics.length && <ChartExample fundsMetrics={fundsMetrics} />}
                 </Paper>
               </Grid>
               {/* CardExample */}
@@ -71,7 +82,7 @@ function DashboardContent() {
               {/* TableExample */}
               <Grid item xs={12}>
                 <Paper sx={{ p: 2, display: 'flex', flexDirection: 'column' }}>
-                  <TableExample />
+                  {funds && funds.length && <TableExample funds={funds} />}
                 </Paper>
               </Grid>
             </Grid>
@@ -79,10 +90,5 @@ function DashboardContent() {
           </Container>
         </Box>
       </Box>
-    </ThemeProvider>
   )
-}
-
-export default function Dashboard() {
-  return <DashboardContent />
 }
