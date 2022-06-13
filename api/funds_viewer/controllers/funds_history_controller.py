@@ -1,21 +1,32 @@
 from funds_viewer.models.funds_history import FundsHistory
-from sqlalchemy import func
+from flask import jsonify
 
-def get_all():
-    funds_history = FundsHistory.query.all()
-    response = [f.to_dict() for f in funds_history]
+
+def get_all(only=None):
+    if only:
+        funds_history = FundsHistory.query.filter(FundsHistory.code.in_(only))
+    else:
+        funds_history = FundsHistory.query.all()
+
+    response = [{**f.to_dict(), 'dividend_yield': f.dividend_yield} for f in funds_history]
 
     return {
+        'only': only,
         'funds_history': response
     }
 
 def get_by_id(id):
-    fund_metric = FundsHistory.query.filter(FundsHistory.id == id).first()
-    return fund_metric.to_dict()
+    fh = FundsHistory.query.filter(FundsHistory.id == id).first()
+    return {**fh.to_dict(), 'dividend_yield': fh.dividend_yield}
 
 def get_dividend_yield_overtime():
-    data = FundsHistory.query.with_entities(FundsHistory.code, func.count(FundsHistory.dividend_yield)).group_by(FundsHistory.code, FundsHistory.dividend_yield).all()
+    data = FundsHistory.query.with_entities(
+        FundsHistory.dividend_yield,
+        FundsHistory.code,
+        FundsHistory.date,
+        FundsHistory.id
+    )
 
     return {
-        'funds_dividend_yields': [d.to_dict() for d in data]
+        'funds_dividend_yields': jsonify(data)
     }

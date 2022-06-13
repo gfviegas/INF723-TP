@@ -1,4 +1,4 @@
-from funds_viewer.models.funds_actives import Funds
+from funds_viewer.models.funds import Funds
 
 def get_all():
     funds = Funds.query.all()
