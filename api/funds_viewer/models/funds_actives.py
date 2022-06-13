@@ -12,3 +12,16 @@ class FundsActives(Base, SerializerMixin):
     city = Column(String)
     uf = Column(String)
     area = Column(Float)
+
+    property
+    def serialized(self):
+        """Return object data in serializeable format"""
+        return {
+            'id': self.id,
+            'code': self.code,
+            'address': self.address,
+            'neighborhood': self.neighborhood,
+            'city': self.city,
+            'uf': self.uf,
+            'area': self.area,
+        }

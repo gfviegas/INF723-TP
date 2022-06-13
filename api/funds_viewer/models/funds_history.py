@@ -25,12 +25,12 @@ class FundsHistory(Base, SerializerMixin):
     def dividend_yield(self):
         if (self.dividends == 0):
             return 0
-        return 100 * (self.close / self.dividends)
+        return 100 * (self.dividends / self.close)
 
     @dividend_yield.expression
     def dividend_yield(cls):
         return case([
-            (cls.dividends != 0, (100 * (cls.close / cls.dividends))),
+            (cls.dividends != 0, (100 * (cls.dividends / cls.close))),
         ], else_ = 0)
 
 
