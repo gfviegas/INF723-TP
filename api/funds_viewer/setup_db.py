@@ -1,6 +1,7 @@
 import os
 
-DATABASE_URI = os.environ.get('DATABASE_URI', 'postgresql://inf723-tp:inf723-tp@localhost:5432/inf723-tp')
+# DATABASE_URI = os.environ.get('DATABASE_URI', 'postgresql://inf723-tp:inf723-tp@localhost:5432/inf723-tp')
+DATABASE_URI = "postgresql://postgres:admin@localhost:5432/postgres"
 
 import re
 import bs4
@@ -28,15 +29,12 @@ print('Initing the database')
 init_db()
 
 FUNDS_HISTORY_COLUMN_MAP = {
-    'Open': 'open',
-    'High': 'high',
-    'Low': 'low',
-    'Close': 'close',
-    'Volume': 'volume',
-    'Dividends': 'dividends',
-    'Stock Splits': 'stock_splits',
-    'Date': 'date',
-    'ticker': 'code'
+    'Datetime': 'date',
+    'Close': 'close_price',
+    'Dividends': 'dividend',
+    'DividendYield': 'dividend_yield',
+    'Ticker': 'code',
+    'Prediction': 'prediction'
 }
 
 FUNDS_METRICS_COLUMN_MAP = {
@@ -69,13 +67,13 @@ FUNDS_METRICS_COLUMN_MAP = {
 }
 
 FUNDS_ACTIVES_COLUMN_MAP = {
-        'Código': 'code',
-        'Endereço': 'address',
-        'Bairro': 'neighborhood',
-        'Cidade': 'city',
-        'Área Bruta Locável': 'area',
-        'UF': 'uf',
-    }
+    'Código': 'code',
+    'Endereço': 'address',
+    'Bairro': 'neighborhood',
+    'Cidade': 'city',
+    'Área Bruta Locável': 'area',
+    'UF': 'uf',
+}
 
 
 
@@ -85,26 +83,31 @@ def updateColumn(columnName, line, newRow):
         item = item.replace("</li>","").replace("m<sup>2</sup>","")
         item = item.replace("N/A","").strip()
         newRow[columnName] = item
-
+    
 def converteData(datas, monthYearOnly):
+
     if monthYearOnly:
         return (datas.split('-')[1] + "/" + datas.split('-')[0])
     else:
         newArray = []
         meses = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"]
 
-    for data in datas:
-        item = data.split("/")
-        mes = str(meses.index(item[0])+1)
-        mes = ("0" + mes)[len(mes)-1:len(mes)+1]
+        for data in datas:
 
-        newArray.append(item[1] + "-" + mes + "-01 00:00:00")
+            item = data.split("/")
+            mes = str(meses.index(item[0])+1)
+            mes = ("0" + mes)[len(mes)-1:len(mes)+1]
 
-    return newArray
+            newArray.append(item[1] + "-" + mes + "-01 00:00:00")
+
+        return newArray
 
 def xgboostPrediction(dataframe, column, month):
+
     new_df = dataframe.copy()
+
     predict_column = column + "_target"
+
     new_df[predict_column] = new_df[column].shift(-month)
 
     treino = new_df[:-1]
@@ -119,15 +122,18 @@ def xgboostPrediction(dataframe, column, month):
 
     modelo_xgb = XGBRegressor(objective="reg:squarederror", n_estimators=1000)
     modelo_xgb.fit(x_treino, y_treino)
+    
+    value = float(validacao[column][-1])
+    predicao = modelo_xgb.predict(value)
 
-    predicao = modelo_xgb.predict(validacao[column][-1])
     return (predicao[0])
 
 def sarimaxPrediction(dataframe, columns, months):
+
     result_df = None
 
     for col in columns:
-        arima_df_aux = dataframe[[col]]
+        arima_df_aux = dataframe[[col]] 
         fit_arima = auto_arima(arima_df_aux, d=1, start_p=1, start_q=1, max_p=3, mar_q=3, seasonal=True, m=6, D=1, start_P=1,start_Q=1, max_P=2, max_Q=2, information_criterion='aic', trace=False, error_action='ignore', stepwise=True)
 
         model=SARIMAX(arima_df_aux, order=fit_arima.order, seasonal_order=fit_arima.seasonal_order)
@@ -143,31 +149,41 @@ def sarimaxPrediction(dataframe, columns, months):
     return (result_df[columns])
 
 def traditionalPredict(dfs, ativo, columns, months):
+
     dataframe = dfs[ativo]
 
     result_df = sarimaxPrediction(dataframe, columns, months)
-    result_df['Rentabilidade'] = result_df['Dividends']/result_df['Close']
-    result_df['Códigodo fundo'] = ativo
+
+    result_df['DividendYield'] = float(result_df['Dividends']/result_df['Close'])*100
+
+    result_df['Ticker'] = ativo
+    result['Prediction'] = True
 
     return result_df
 
 def machineLearningPredict(dfs, ativo, columns, months_to_predict):
+
     xgboost_df = None
 
     dataframe = dfs[ativo]
 
     for m in range(len(months_to_predict)):
+
         predict_months = m+1
+
         result = {}
 
         for col in columns:
             result[col] = xgboostPrediction(dataframe,col, predict_months)
+        
+        result['DividendYield'] = float(result['Dividends']/result['Close'])*100
 
-        result['Rentabilidade'] = result['Dividends']/result['Close']
-        result['Códigodo fundo'] = ativo
+        result['Ticker'] = ativo
         result['Date'] = months_to_predict[m]
+        result['Prediction'] = True
 
         result_df = pd.DataFrame.from_dict([result])
+
         result_df = result_df.set_index('Date')
         result_df.index = pd.to_datetime(result_df.index)
 
@@ -175,7 +191,7 @@ def machineLearningPredict(dfs, ativo, columns, months_to_predict):
             xgboost_df = result_df.copy()
         else:
             xgboost_df = pd.concat([xgboost_df, result_df])
-
+      
     return xgboost_df
 
 def run_crawling():
@@ -238,6 +254,7 @@ def run_crawling():
     remover_fundos = []
 
     for t in df['Códigodo fundo']:
+
         ticker = yf.Ticker(t + '.SA')
         aux = ticker.history(interval='1mo',period="max")
 
@@ -255,7 +272,7 @@ def run_crawling():
         else:
             print('Lendo FII {}...'.format(t))
             aux.reset_index(inplace=True)
-            aux['ticker'] = t
+            aux['Ticker'] = t
 
             new_dates = []
             add_month = dateutil.relativedelta.relativedelta(months=1)
@@ -269,11 +286,9 @@ def run_crawling():
                 new_dates.append(newDate)
 
             aux['new_dates'] = new_dates
+            aux['Prediction'] = False
 
             dfs[t] = aux
-            #df[df['Códigodo fundo'] == t]['Preço futuro (1m)'] =
-            #dfs[t]['mm5d'] = dfs[t]['Close'].rolling(5).mean()
-            #dfs[t]['mm21d'] = dfs[t]['Close'].rolling(21).mean()
             dfs[t] = dfs[t].shift(-1)
             dfs[t].dropna(inplace=True)
             dfs[t] = dfs[t].reset_index(drop=True)
@@ -287,13 +302,14 @@ def run_crawling():
                 remover_fundos.append(t)
                 del dfs[t]
                 print("FII " + t + " será removido por estar com dados faltantes.")
-
+            
     df = df[~df.isin(remover_fundos).any(axis=1)]
 
-    columns = {'Código': [],'Endereço': [], 'Bairro': [], 'Cidade': [], 'Área Bruta Locável': []}
-    df_ativos = pd.DataFrame(columns)
+    columns = {'Código': [],'Endereço': [], 'Bairro': [], 'Cidade': [], 'Área Bruta Locável': []}  
+    df_ativos = pd.DataFrame(columns)   
 
     for fundo in dfs:
+
         url = 'https://www.fundsexplorer.com.br/funds/' + fundo
         response = requests.get(url, headers=headers)
 
@@ -313,17 +329,17 @@ def run_crawling():
         for i in range(len(datas)):
             dfs[fundo].loc[dfs[fundo].index[dfs[fundo].index == datas[i]],'Dividends'] = dividends[i]
 
-        print('\tInserindo dados do fundo {}'.format(fundo))
-        dfs[fundo].rename(columns=FUNDS_HISTORY_COLUMN_MAP).to_sql('funds_history', engine, if_exists='append', index=False)
-
         if ('Ativos do ') in str(response.content):
+
             print("Coletando ativos de " + fundo + "...")
 
             soup = BeautifulSoup(response.content,"lxml")
             w3schollsList = soup.find("div",id="fund-actives-items")
+
             lista = w3schollsList.find_all('ul')
 
             for l in lista:
+
                 newRow = {}
 
                 itemList = l.find_all('li')
@@ -344,7 +360,43 @@ def run_crawling():
     df_ativos['UF'] = df_ativos['Cidade'].str[-2:]
     df_ativos['Área Bruta Locável'] = pd.to_numeric(df_ativos['Área Bruta Locável'].str.replace(r"\.", "").str.replace(r"\,", "."), errors='coerce').astype(float)
 
-    return {'df': df, 'df_ativos': df_ativos}
+
+    # Calculando datas de interesse
+    months_to_predict = []
+    qnt_months_to_predict = 2
+
+    for i in range(qnt_months_to_predict):
+        add_month = dateutil.relativedelta.relativedelta(months=i)
+        months_to_predict.append((first_day + add_month).strftime("%Y-%m-%d"))
+
+    xgboost_dfs = None
+    for t in df['Códigodo fundo']:
+        print("Predicting with Machine Learning: " + t + "...")
+        aux_df = machineLearningPredict(dfs,t,['Close','Dividends'],months_to_predict)
+
+        if xgboost_dfs is None:
+            xgboost_dfs = aux_df.copy()
+        else:
+            xgboost_dfs = pd.concat([xgboost_dfs, aux_df])
+
+    df_history = None
+    xgboost_dfs['Datetime'] = xgboost_dfs.index
+
+    for t in df['Códigodo fundo']:
+        
+        dfs[t]['Datetime'] = dfs[t].index
+        dfs[t]['DividendYield'] = float(dfs[t]['Dividends'][0]/dfs[t]['Close'][0]) * 100
+        
+        df_aux = dfs[t][['Datetime','Close','Dividends','DividendYield','Ticker','Prediction']]
+        
+        if df_history is None:
+            df_history = df_aux.copy()
+        else:
+            df_history = df_history.append(df_aux, ignore_index = False)
+        
+        df_history = df_history.append(xgboost_dfs[(xgboost_dfs['Ticker'] == t)].copy(), ignore_index = False)
+
+    return {'df': df, 'df_ativos': df_ativos, 'df_history': df_history}
 
 # DE FATO INSERINDO
 def run_insertion():
@@ -366,18 +418,14 @@ def run_insertion():
     funds_metrics_df = crawling_results['df'].rename(columns=FUNDS_METRICS_COLUMN_MAP)
     funds_metrics_df.to_sql('funds_metrics', engine, if_exists='replace', index_label='id')
 
+    print('Inserting the history data...')
+    funds_history_df = crawling_results['df_history'].rename(columns=FUNDS_HISTORY_COLUMN_MAP)
+    funds_history_df.to_sql('funds_history', engine, if_exists='replace', index_label='id')
+
     print('Inserting the info data...')
     funds_info_df = funds_metrics_df[['code', 'sector']]
     funds_info_df.to_sql('funds', engine, if_exists='replace', index_label='id')
 
-    # # Pra cada fundo, insere seus dados historicos na tabela
-    # history_id = 1
-    # for f in funds_df['code'].unique():
-    #     df = crawling_results['dfs'][f].reset_index().drop('new_dates', axis=1)
-    #     df['id'] = df.df.assign(id=df.index + history_id)
-    #     history_id += len(df)
-    #     print('Inserindo serie histórica do fundo {} - {}'.format(f, history_id))
-    #     df.rename(columns=FUNDS_HISTORY_COLUMN_MAP).to_sql('funds_history', engine, if_exists='replace')
-
 if __name__ == '__main__':
     run_insertion()
+    print(pd.read_sql("funds_history",engine))

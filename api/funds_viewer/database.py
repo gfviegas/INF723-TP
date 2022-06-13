@@ -1,5 +1,6 @@
 import os
-DATABASE_URI = os.environ.get('DATABASE_URI', 'postgresql://inf723-tp:inf723-tp@localhost:5432/inf723-tp')
+#DATABASE_URI = os.environ.get('DATABASE_URI', 'postgresql://inf723-tp:inf723-tp@localhost:5432/inf723-tp')
+DATABASE_URI = "postgresql://postgres:admin@localhost:5432/postgres"
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import scoped_session, sessionmaker
