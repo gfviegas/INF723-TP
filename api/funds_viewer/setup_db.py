@@ -1,4 +1,5 @@
 import os
+
 DATABASE_URI = os.environ.get('DATABASE_URI', 'postgresql://inf723-tp:inf723-tp@localhost:5432/inf723-tp')
 
 import re
@@ -20,6 +21,63 @@ from statsmodels.tsa.statespace.sarimax import SARIMAX
 import numpy as np
 import pandas as pd
 import yfinance as yf
+
+from funds_viewer.database import engine, init_db
+from sqlalchemy import text
+print('Initing the database')
+init_db()
+
+FUNDS_HISTORY_COLUMN_MAP = {
+    'Open': 'open',
+    'High': 'high',
+    'Low': 'low',
+    'Close': 'close',
+    'Volume': 'volume',
+    'Dividends': 'dividends',
+    'Stock Splits': 'stock_splits',
+    'Date': 'date',
+    'ticker': 'code'
+}
+
+FUNDS_METRICS_COLUMN_MAP = {
+    'Códigodo fundo': 'code',
+    'Setor': 'sector',
+    'Preço Atual': 'current_price',
+    'Liquidez Diária': 'daily_liquidity',
+    'Dividendo': 'dividend',
+    'DividendYield': 'dividend_yield',
+    'DY (3M)Acumulado': 'dy_3m_accumulated',
+    'DY (6M)Acumulado': 'dy_6m_accumulated',
+    'DY (12M)Acumulado': 'dy_12m_accumulated',
+    'DY (3M)Média': 'dy_3m_average',
+    'DY (6M)Média': 'dy_6m_average',
+    'DY (12M)Média': 'dy_12m_average',
+    'DY Ano': 'dy_year',
+    'Variação Preço': 'price_variation',
+    'Rentab.Período': 'income_period',
+    'Rentab.Acumulada': 'income_accumulated',
+    'PatrimônioLíq.': 'net_worth',
+    'VPA': 'vpa',
+    'P/VPA': 'p_vpa',
+    'DYPatrimonial': 'equity_dy',
+    'VariaçãoPatrimonial': 'equity_variation',
+    'Rentab. Patr.no Período': 'equity_return_period',
+    'Rentab. Patr.Acumulada': 'equity_return_accumulated',
+    'VacânciaFísica': 'physical_vacancy',
+    'VacânciaFinanceira': 'financial_vacancy',
+    'QuantidadeAtivos': 'assets_quality'
+}
+
+FUNDS_ACTIVES_COLUMN_MAP = {
+        'Código': 'code',
+        'Endereço': 'address',
+        'Bairro': 'neighborhood',
+        'Cidade': 'city',
+        'Área Bruta Locável': 'area',
+        'UF': 'uf',
+    }
+
+
 
 def updateColumn(columnName, line, newRow):
     if '<b>'+columnName+':</b>' in line:
@@ -255,6 +313,9 @@ def run_crawling():
         for i in range(len(datas)):
             dfs[fundo].loc[dfs[fundo].index[dfs[fundo].index == datas[i]],'Dividends'] = dividends[i]
 
+        print('\tInserindo dados do fundo {}'.format(fundo))
+        dfs[fundo].rename(columns=FUNDS_HISTORY_COLUMN_MAP).to_sql('funds_history', engine, if_exists='append', index=False)
+
         if ('Ativos do ') in str(response.content):
             print("Coletando ativos de " + fundo + "...")
 
@@ -281,68 +342,42 @@ def run_crawling():
     columns_str = ['Código','Endereço', 'Bairro', 'Cidade']
     df_ativos[columns_str] = df_ativos[columns_str].astype("string")
     df_ativos['UF'] = df_ativos['Cidade'].str[-2:]
+    df_ativos['Área Bruta Locável'] = pd.to_numeric(df_ativos['Área Bruta Locável'].str.replace(r"\.", "").str.replace(r"\,", "."), errors='coerce').astype(float)
 
-    return (df, df_ativos)
+    return {'df': df, 'df_ativos': df_ativos}
 
 # DE FATO INSERINDO
 def run_insertion():
-    from funds_viewer.database import engine, init_db
-
-    print('Initing the database')
-    init_db()
-
     print('Checking if the database needs seeding')
-    from funds_viewer.models.funds import Funds
-    if Funds.query.count() > 1:
-        print('Database already has funds data. Skipping...')
-        return
+    with engine.connect() as connection:
+        result = connection.execute(text("SELECT COUNT(*) FROM funds;"))
+        for r in result:
+            if (r and r[0] and r[0] > 50): return True
 
     print('Crawling...')
-    df, df_ativos = run_crawling()
+    crawling_results = run_crawling()
 
-    print('Inserting the data...')
+    print('Inserting the actives data...')
+    funds_df = crawling_results['df_ativos'].rename(columns=FUNDS_ACTIVES_COLUMN_MAP)
+    print(funds_df.head(2))
+    funds_df.to_sql('funds_actives', engine, if_exists='replace', index_label='id')
 
-    funds_df = df_ativos.rename(columns={
-        'Código': 'code',
-        'Endereço': 'address',
-        'Bairro': 'neighborhood',
-        'Cidade': 'city',
-        'Área Bruta Locável': 'area',
-        'UF': 'uf',
-    })
-    funds_df.to_sql('funds', engine, if_exists='replace', index_label='id')
-
-
-    funds_metrics_df = df.rename(columns={
-        'Códigodo fundo': 'code',
-        'Setor': 'sector',
-        'Preço Atual': 'current_price',
-        'Liquidez Diária': 'daily_liquidity',
-        'Dividendo': 'dividend',
-        'DividendYield': 'dividend_yield',
-        'DY (3M)Acumulado': 'dy_3m_accumulated',
-        'DY (6M)Acumulado': 'dy_6m_accumulated',
-        'DY (12M)Acumulado': 'dy_12m_accumulated',
-        'DY (3M)Média': 'dy_3m_average',
-        'DY (6M)Média': 'dy_6m_average',
-        'DY (12M)Média': 'dy_12m_average',
-        'DY Ano': 'dy_year',
-        'Variação Preço': 'price_variation',
-        'Rentab.Período': 'income_period',
-        'Rentab.Acumulada': 'income_accumulated',
-        'PatrimônioLíq.': 'net_worth',
-        'VPA': 'vpa',
-        'P/VPA': 'p_vpa',
-        'DYPatrimonial': 'equity_dy',
-        'VariaçãoPatrimonial': 'equity_variation',
-        'Rentab. Patr.no Período': 'equity_return_period',
-        'Rentab. Patr.Acumulada': 'equity_return_accumulated',
-        'VacânciaFísica': 'physical_vacancy',
-        'VacânciaFinanceira': 'financial_vacancy',
-        'QuantidadeAtivos': 'assets_quality'
-    })
+    print('Inserting the metrics data...')
+    funds_metrics_df = crawling_results['df'].rename(columns=FUNDS_METRICS_COLUMN_MAP)
     funds_metrics_df.to_sql('funds_metrics', engine, if_exists='replace', index_label='id')
 
+    print('Inserting the info data...')
+    funds_info_df = funds_metrics_df[['code', 'sector']]
+    funds_info_df.to_sql('funds', engine, if_exists='replace', index_label='id')
+
+    # # Pra cada fundo, insere seus dados historicos na tabela
+    # history_id = 1
+    # for f in funds_df['code'].unique():
+    #     df = crawling_results['dfs'][f].reset_index().drop('new_dates', axis=1)
+    #     df['id'] = df.df.assign(id=df.index + history_id)
+    #     history_id += len(df)
+    #     print('Inserindo serie histórica do fundo {} - {}'.format(f, history_id))
+    #     df.rename(columns=FUNDS_HISTORY_COLUMN_MAP).to_sql('funds_history', engine, if_exists='replace')
 
 if __name__ == '__main__':
     run_insertion()

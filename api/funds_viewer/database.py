@@ -14,8 +14,8 @@ Base = declarative_base()
 Base.query = db_session.query_property()
 
 def init_db():
-    from funds_viewer.models import funds, funds_metrics
+    from funds_viewer.models import funds_metrics, funds_actives, funds, funds_history
 
-    print(funds, funds_metrics)
+    print(funds_actives, funds_metrics, funds, funds_history)
 
     Base.metadata.create_all(bind=engine)

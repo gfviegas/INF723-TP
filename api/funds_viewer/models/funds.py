@@ -7,8 +7,4 @@ class Funds(Base, SerializerMixin):
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     code = Column(String, index=True)
-    address = Column(String)
-    neighborhood = Column(String)
-    city = Column(String)
-    uf = Column(String)
-    area = Column(Integer)
+    sector = Column(String)
