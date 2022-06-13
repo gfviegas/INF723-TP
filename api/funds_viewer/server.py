@@ -34,6 +34,10 @@ def get_funds_actives():
 def get_funds_actives_by_ufs():
     return funds_actives_controller.get_actives_by_ufs()
 
+@app.route('/funds_actives_by_ufs_and_funds', methods=['GET'])
+def get_funds_actives_by_ufs_and_funds():
+    return funds_actives_controller.get_actives_by_ufs_and_funds()
+
 @app.route('/funds_actives/<id>', methods=['GET'])
 def get_funds_actives_by_id(id):
     return funds_actives_controller.get_by_id(id)

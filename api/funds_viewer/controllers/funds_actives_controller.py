@@ -22,8 +22,22 @@ def get_by_id(id):
     return active.to_dict()
 
 def get_actives_by_ufs():
-    data = FundsActives.query.with_entities(FundsActives.uf, sql.label('count', func.count(FundsActives.uf))).group_by(FundsActives.uf).all()
+    data = FundsActives.query.with_entities(
+        FundsActives.uf,
+        sql.label('count', func.count(FundsActives.uf)
+    )).group_by(FundsActives.uf).all()
 
     return {
         'funds_actives': [{ 'uf': d.uf, 'count': d.count } for d in data]
+    }
+
+def get_actives_by_ufs_and_funds():
+    data = FundsActives.query.with_entities(
+        FundsActives.code,
+        FundsActives.uf,
+        sql.label('count', func.count(FundsActives.uf)
+    )).group_by(FundsActives.code, FundsActives.uf).all()
+
+    return {
+        'funds_actives': [{ 'uf': d.uf, 'count': d.count, 'code': d.code } for d in data]
     }
