@@ -8,8 +8,8 @@ from sqlalchemy.ext.hybrid import hybrid_property
 
 class FundsHistory(Base, SerializerMixin):
     __tablename__ = 'funds_history'
-    code = Column(String, index=True)
-    date = Column(Date)
+    code = Column(String, index=True, primary_key=True)
+    date = Column(Date, primary_key=True)
     # open = Column(Float)
     # high = Column(Float)
     # low = Column(Float)
