@@ -83,7 +83,7 @@ def updateColumn(columnName, line, newRow):
         item = item.replace("</li>","").replace("m<sup>2</sup>","")
         item = item.replace("N/A","").strip()
         newRow[columnName] = item
-    
+
 def converteData(datas, monthYearOnly):
 
     if monthYearOnly:
@@ -122,7 +122,7 @@ def xgboostPrediction(dataframe, column, month):
 
     modelo_xgb = XGBRegressor(objective="reg:squarederror", n_estimators=1000)
     modelo_xgb.fit(x_treino, y_treino)
-    
+
     value = float(validacao[column][-1])
     predicao = modelo_xgb.predict(value)
 
@@ -133,7 +133,7 @@ def sarimaxPrediction(dataframe, columns, months):
     result_df = None
 
     for col in columns:
-        arima_df_aux = dataframe[[col]] 
+        arima_df_aux = dataframe[[col]]
         fit_arima = auto_arima(arima_df_aux, d=1, start_p=1, start_q=1, max_p=3, mar_q=3, seasonal=True, m=6, D=1, start_P=1,start_Q=1, max_P=2, max_Q=2, information_criterion='aic', trace=False, error_action='ignore', stepwise=True)
 
         model=SARIMAX(arima_df_aux, order=fit_arima.order, seasonal_order=fit_arima.seasonal_order)
@@ -175,7 +175,7 @@ def machineLearningPredict(dfs, ativo, columns, months_to_predict):
 
         for col in columns:
             result[col] = xgboostPrediction(dataframe,col, predict_months)
-        
+
         result['DividendYield'] = float(result['Dividends']/result['Close'])*100
 
         result['Ticker'] = ativo
@@ -191,7 +191,7 @@ def machineLearningPredict(dfs, ativo, columns, months_to_predict):
             xgboost_df = result_df.copy()
         else:
             xgboost_df = pd.concat([xgboost_df, result_df])
-      
+
     return xgboost_df
 
 def run_crawling():
@@ -302,11 +302,11 @@ def run_crawling():
                 remover_fundos.append(t)
                 del dfs[t]
                 print("FII " + t + " será removido por estar com dados faltantes.")
-            
+
     df = df[~df.isin(remover_fundos).any(axis=1)]
 
-    columns = {'Código': [],'Endereço': [], 'Bairro': [], 'Cidade': [], 'Área Bruta Locável': []}  
-    df_ativos = pd.DataFrame(columns)   
+    columns = {'Código': [],'Endereço': [], 'Bairro': [], 'Cidade': [], 'Área Bruta Locável': []}
+    df_ativos = pd.DataFrame(columns)
 
     for fundo in dfs:
 
@@ -383,17 +383,17 @@ def run_crawling():
     xgboost_dfs['Datetime'] = xgboost_dfs.index
 
     for t in df['Códigodo fundo']:
-        
+
         dfs[t]['Datetime'] = dfs[t].index
         dfs[t]['DividendYield'] = float(dfs[t]['Dividends'][0]/dfs[t]['Close'][0]) * 100
-        
+
         df_aux = dfs[t][['Datetime','Close','Dividends','DividendYield','Ticker','Prediction']]
-        
+
         if df_history is None:
             df_history = df_aux.copy()
         else:
             df_history = df_history.append(df_aux, ignore_index = False)
-        
+
         df_history = df_history.append(xgboost_dfs[(xgboost_dfs['Ticker'] == t)].copy(), ignore_index = False)
 
     return {'df': df, 'df_ativos': df_ativos, 'df_history': df_history}
@@ -420,7 +420,7 @@ def run_insertion():
 
     print('Inserting the history data...')
     funds_history_df = crawling_results['df_history'].rename(columns=FUNDS_HISTORY_COLUMN_MAP)
-    funds_history_df.to_sql('funds_history', engine, if_exists='replace', index_label='id')
+    funds_history_df.to_sql('funds_history', engine, if_exists='replace', index=False)
 
     print('Inserting the info data...')
     funds_info_df = funds_metrics_df[['code', 'sector']]
