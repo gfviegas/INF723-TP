@@ -28,15 +28,27 @@ def get_fund_by_id(id):
 ### FUNDS ACTIVES
 @app.route('/funds_actives', methods=['GET'])
 def get_funds_actives():
-    return funds_actives_controller.get_all()
+    args = request.args
+    only = list(filter(lambda x: len(x), args.get('only', default='').split(',')))
+    only = only if len(only) else None
+
+    return funds_actives_controller.get_all(only=only)
 
 @app.route('/funds_actives_by_ufs', methods=['GET'])
 def get_funds_actives_by_ufs():
-    return funds_actives_controller.get_actives_by_ufs()
+    args = request.args
+    only = list(filter(lambda x: len(x), args.get('only', default='').split(',')))
+    only = only if len(only) else None
+
+    return funds_actives_controller.get_actives_by_ufs(only=only)
 
 @app.route('/funds_actives_by_ufs_and_funds', methods=['GET'])
 def get_funds_actives_by_ufs_and_funds():
-    return funds_actives_controller.get_actives_by_ufs_and_funds()
+    args = request.args
+    only = list(filter(lambda x: len(x), args.get('only', default='').split(',')))
+    only = only if len(only) else None
+
+    return funds_actives_controller.get_actives_by_ufs_and_funds(only=only)
 
 @app.route('/funds_actives/<id>', methods=['GET'])
 def get_funds_actives_by_id(id):
@@ -55,7 +67,7 @@ def get_fund_metrics_by_id(id):
 @app.route('/funds_history', methods=['GET'])
 def get_funds_history():
     args = request.args
-    only = args.get('only', default='').split(',')
+    only = list(filter(lambda x: len(x), args.get('only', default='').split(',')))
     only = only if len(only) else None
 
     return funds_history_controller.get_all(only=only)

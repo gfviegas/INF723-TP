@@ -3,11 +3,7 @@ from flask import jsonify
 
 
 def get_all(only=None):
-    if only:
-        funds_history = FundsHistory.query.filter(FundsHistory.code.in_(only))
-    else:
-        funds_history = FundsHistory.query.all()
-
+    funds_history = FundsHistory.query.filter(FundsHistory.code.in_(only)) if only else FundsHistory.query.all()
     response = [{**f.to_dict(), 'dividend_yield': f.dividend_yield} for f in funds_history]
 
     return {
@@ -23,8 +19,7 @@ def get_dividend_yield_overtime():
     data = FundsHistory.query.with_entities(
         FundsHistory.dividend_yield,
         FundsHistory.code,
-        FundsHistory.date,
-        FundsHistory.id
+        FundsHistory.date
     )
 
     return {

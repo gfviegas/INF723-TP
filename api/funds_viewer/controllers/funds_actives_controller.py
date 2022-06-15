@@ -9,7 +9,7 @@ def row2dict(row):
         for c in row.__table__.columns
     }
 
-def get_all():
+def get_all(only=None):
     funds_actives = FundsActives.query.all()
     response = [f.to_dict() for f in funds_actives]
 
@@ -21,8 +21,11 @@ def get_by_id(id):
     active = FundsActives.query.filter(FundsActives.id == id).first()
     return active.to_dict()
 
-def get_actives_by_ufs():
-    data = FundsActives.query.with_entities(
+def get_actives_by_ufs(only=None):
+    data = FundsActives.query.filter(FundsActives.code.in_(only)).with_entities(
+        FundsActives.uf,
+        sql.label('count', func.count(FundsActives.uf)
+    )).group_by(FundsActives.uf).all() if only else FundsActives.query.with_entities(
         FundsActives.uf,
         sql.label('count', func.count(FundsActives.uf)
     )).group_by(FundsActives.uf).all()
@@ -31,8 +34,12 @@ def get_actives_by_ufs():
         'funds_actives': [{ 'uf': d.uf, 'count': d.count } for d in data]
     }
 
-def get_actives_by_ufs_and_funds():
-    data = FundsActives.query.with_entities(
+def get_actives_by_ufs_and_funds(only=None):
+    data = FundsActives.query.filter(FundsActives.code.in_(only)).with_entities(
+        FundsActives.code,
+        FundsActives.uf,
+        sql.label('count', func.count(FundsActives.uf)
+    )).group_by(FundsActives.code, FundsActives.uf).all() if only else FundsActives.query.with_entities(
         FundsActives.code,
         FundsActives.uf,
         sql.label('count', func.count(FundsActives.uf)

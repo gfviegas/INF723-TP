@@ -1,4 +1,10 @@
 export interface Fund {
+  id: number
+  code: string
+  sector: string
+}
+
+export interface FundActive {
   address: string
   area?: string
   city?: string
@@ -6,6 +12,26 @@ export interface Fund {
   id: number
   neighborhood: string
   uf: string
+}
+
+export interface FundActiveByUf {
+  uf: string
+  count: number
+}
+
+export interface FundActiveByUfAndFund {
+  uf: string
+  count: number
+  code: string
+}
+
+export interface FundHistory {
+  close_price: number
+  code: string
+  date: string | Date | number,
+  dividend: number
+  dividend_yield: number
+  prediction: boolean
 }
 
 export interface FundMetric {

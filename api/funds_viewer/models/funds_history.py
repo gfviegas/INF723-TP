@@ -15,7 +15,7 @@ class FundsHistory(Base, SerializerMixin):
     # low = Column(Float)
     close_price = Column(Float)
     # volume = Column(Integer)
-    dividends = Column(Float)
+    dividend = Column(Float)
     # stock_splits = Column(Float)
     dividend_yield = Column(Float)
     prediction = Column(Boolean)
